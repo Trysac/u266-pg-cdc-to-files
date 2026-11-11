@@ -9,4 +9,5 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Added PostgreSQL wal2json format-version 2 to rotating JSONL file writer with atomic LSN checkpoint and exactly-once resume
 - Initial project structure from the factory utility template.

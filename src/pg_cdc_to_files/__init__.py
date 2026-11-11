@@ -1,24 +1,30 @@
-"""
-Write PostgreSQL logical decoding changes in wal2json format-version 2 to rotating JSONL files per
-table, committed transactions only, with an atomic LSN checkpoint and exactly-once resume
+"""PostgreSQL CDC to files using wal2json format-version 2.
+
+Public API:
+- parse_lsn / format_lsn for LSN conversion
+- CdcError with stable error codes
+- ChangeSource protocol
+- CdcWriter for per-table rotating JSONL files and atomic checkpoint
+- run() to process the stream
 """
 
 from __future__ import annotations
 
-__all__ = ["__version__", "normalize"]
+from ._errors import CdcError
+from ._lsn import format_lsn, parse_lsn
+from ._model import ChangeSource, RunStats
+from ._runner import run
+from ._writer import CdcWriter
+
+__all__ = [
+    "CdcError",
+    "CdcWriter",
+    "ChangeSource",
+    "RunStats",
+    "__version__",
+    "format_lsn",
+    "parse_lsn",
+    "run",
+]
 
 __version__ = "0.1.0"
-
-
-def normalize(value: str) -> str:
-    """Return ``value`` trimmed and lower-cased.
-
-    Placeholder API created by the template: replace it with the utility's real behavior.
-
-    Raises:
-        ValueError: if ``value`` is empty or only whitespace.
-    """
-    cleaned = value.strip()
-    if not cleaned:
-        raise ValueError("value must not be empty")
-    return cleaned.lower()
