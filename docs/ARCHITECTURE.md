@@ -1,29 +1,32 @@
 # Architecture
 
-## Purpose
+This library consumes wal2json format-version 2 messages and writes committed
+transactions to rotating per-table JSONL files with an atomic checkpoint.
 
-`trysac-pg-cdc-to-files` is a small, dependency-free Python library: Write PostgreSQL logical decoding changes in wal2json format-version 2 to rotating JSONL files per table, committed transactions only, with an atomic LSN checkpoint and exactly-once resume
+## Components
 
-## Shape
+- `lsn.py`: parse/format PostgreSQL LSN values (`X/Y`).
+- `writer.py`: `CdcWriter` manages per-table files, rotation, and checkpoint
+  persistence. On `prepare()`, it reads the checkpoint and truncates files to
+  recorded byte offsets.
+- `runner.py`: `run()` orchestrates reading messages from a `ChangeSource`,
+  buffering per transaction, writing on commit, and acknowledging sources.
+- `errors.py`: `CdcError` with machine-readable codes.
 
-```text
-caller code --> pg_cdc_to_files (public API in __init__.py)
-                    |
-                    +-- pure functions, no I/O, no global state
-```
+## Design Decisions
 
-- **Public API**: the names listed in `__all__` of `src/pg_cdc_to_files/__init__.py`. Anything else is
-  internal and may change without a major version.
-- **Errors**: invalid input raises built-in exceptions (`ValueError`, `TypeError`) with a clear
-  message; the library never prints or exits.
-- **Side effects**: none. If a feature needs I/O, isolate it in its own module behind a small
-  interface and record the choice in an ADR.
+- **Only committed transactions are written.** Changes are buffered until a
+  COMMIT message; the commit LSN is used for the record and checkpoint.
+- **Exactly-once resume.** The checkpoint stores each table's current file,
+  record count, and byte offset. On startup, files are truncated to those
+  offsets, eliminating duplicate lines written after the last checkpoint.
+- **Per-table rotating files.** Files are named `<6-digit sequence>.jsonl` inside
+  a directory named `<schema>.<table>`; rotation occurs before exceeding
+  `max_file_records` or `max_file_bytes`.
+- **Atomic checkpoint.** The checkpoint is written via a temporary file, fsynced,
+  and `os.replace`d, then the directory is fsynced. Source acknowledgment happens
+  only after this succeeds.
+- **No runtime dependencies.** Uses only the Python standard library; `decimal`
+  preserves numeric precision.
 
-## Quality contract
-
-`scripts/check.py` is the single definition of the gates; `fabrica.json` tells the factory and CI
-how to run it. See [TESTING.md](TESTING.md).
-
-## Decisions
-
-Architecture decisions are recorded in [decisions/](decisions/) as numbered ADRs.
+See `docs/SECURITY.md` for the threat model.
